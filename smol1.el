@@ -127,7 +127,8 @@ code 😎"
 	   value)))))))
 
 (defun smol1-eval/variable (exp env)
-  "Evaluate a variable reference EXP given environment ENV."
+  "Evaluate a variable reference EXP given environment ENV by looking up the
+value stored at the location to which the variable is bound."
   (let ((variable-value (smol1-env-get env (smol1-key<-symbol exp))))
 	     (if (eq smol1-constant-void variable-value)
 		 (smol1-error "Unbound variable"
