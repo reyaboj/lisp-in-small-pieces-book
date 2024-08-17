@@ -236,6 +236,43 @@ PARAMETERS and Ai is from ARGUMENTS."
 						    (cdr arguments))))
     nil))
 
+;;; Guest / Host interaction
+(defmacro smol1-lambda (env args &rest body)
+  "Create an arbitrary host procedure that follows smol1 calling conventions in
+its parameter list, using ENV and ARGS as the names of the calling environment
+and argument lists, respectively, and BODY as the procedure body."
+  `#'(lambda (,env &optional ,args) ,@body))
+
+(defun smol1-env-defprimitive ( env primitive-name host-fun check-args-p-fun transform-fun )
+  "Return a new environment that is the same as ENV, but with PRIMITIVE-NAME
+bound to a procedure callable via that environment.
+
+The bound procedure uses CHECK-ARGS-P-FUN to verify that the argument list to be
+passed to HOST-FUN is valid (e.g., correct arity); errors from attempting to
+call CHECK-ARGS-P-FUN are caught and handled as failures in handling the
+argument list. This bound primitive works as described next.
+
+If CHECK-ARGS-P-FUN returns non-nil when passed the same arguments as HOST-FUN,
+HOST-FUN is called with the arguments as seen by CHECK-ARGS-P-FUN, and the
+result is passed to TRANSFORM-FUN, which yields the final result appropriate to
+the guest language.
+
+If CHECK-ARGS-P-FUN returns nil, or an error is signaled from within its body or
+as a result of attempting to call CHECK-ARGS-P-FUN, then the argument list is
+considered invalid and an error is thrown from the bound primitive."
+  (smol1-env-bind
+   env
+   primitive-name
+   (smol1-lambda _ args			; ignore call site environment
+		 (let (host-error-data)
+		   (if (condition-case e
+			   (apply check-args-p-fun args)
+			 (error (setq host-error-data e) nil))
+		       (funcall transform-fun (apply host-fun args))
+		     (smol1-error "Invalid call to primitive"
+				  `( :primitive ,primitive-name
+				     :arguments ,args
+				     :host-error ,host-error-data )))))))
 ;;; Error / warning reporting:
 (defun smol1-error (message error-context)
   "Signal an error with the supplied MESSAGE, printing the read representation
