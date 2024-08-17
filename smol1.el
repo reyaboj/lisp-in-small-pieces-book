@@ -60,11 +60,7 @@ code 😎"
 	((quote) (smol1-eval/quote operand-forms))
 	((if) (smol1-eval/if operand-forms env))
 	((begin) (smol1-eval/begin operand-forms env))
-	((set!)
-	 (let* ((variable (car operand-forms))
-		(value-form (cadr operand-forms))
-		(value (smol1-eval value-form env)))
-	   (smol1-env-rebind env (smol1-key<-symbol variable) value)))
+	((set!) (smol1-eval/set! operand-forms env))
 	((lambda)
 	 (let* ((parameter-spec (car operand-forms))
 		(body (cdr operand-forms))
@@ -154,6 +150,20 @@ forms given by OPERANDS, with environment ENV as the current active bindings."
 	  (smol1-eval (car body) env)
 	(smol1-eval (car body) env)
 	(eval-begin (cdr body))))))
+
+(defun smol1-eval/set! (operands env)
+  "Modify environment ENV based on (VAR VALUE-FORM) supplied by OPERANDS. The
+return value is unspecified and should be discarded. It is an error if the
+variable VAR does not have an existing binding at the point of attempting to
+modify it."
+  (let* ((variable (car operands))
+	 (value-form (cadr operands))
+	 (value (smol1-eval value-form env)))
+    (if (smol1-env-rebind env (smol1-key<-symbol variable) value)
+	smol1-constant-void
+      (smol1-error "Attempting set! on unbound variable"
+		   `( :variable ,variable
+		      :env ,env )))))
 
 ;;; Special values
 (defconst smol1-constant-void (list 'smol1 :void)

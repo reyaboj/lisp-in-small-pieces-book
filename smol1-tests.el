@@ -86,9 +86,11 @@
 			   'x 1 'y 2)))
     (should (equal 1 (smol1-eval 'x e)))
     (should (equal 2 (smol1-eval 'y e)))
-    (smol1-eval '(set! x 42) e)
+    (should (equal smol1-constant-void
+		   (smol1-eval '(set! x 42) e)))
     (should (equal 42 (smol1-eval 'x e)))
-    (should (equal 2 (smol1-eval 'y e)))))
+    (should (equal 2 (smol1-eval 'y e)))
+    (should-error (smol1-eval '(set! z 0) e))))
 
 (ert-deftest smol1-eval/special-form/lambda ()
   "(lambda PARAM-SPEC BODY-FORMS) creates a procedure."
