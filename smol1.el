@@ -113,8 +113,9 @@ code 😎"
 				   :arguments ,arguments ))
 		 (let* ((env (apply #'smol1-env-bind
 				    definition-env
-				    (-interleave required-parameters
-						 required-arguments)))
+				    (smol1-interleave-params-and-args
+				     required-parameters
+				     required-arguments)))
 			(env (if (not rest-parameter) env
 			       (smol1-env-bind
 				env
@@ -218,6 +219,16 @@ return nil. If an association was successfully modified, return non-nil."
 	nil
       (setcdr binding value)
       binding)))
+
+(defun smol1-interleave-params-and-args (parameters arguments)
+  "Return an interleaved list of elements (P1 A1 P2 A2 ...) where Pi is from
+PARAMETERS and Ai is from ARGUMENTS."
+  (if parameters
+      (cons (car parameters)
+	    (cons (car arguments)
+		  (smol1-interleave-params-and-args (cdr parameters)
+						    (cdr arguments))))
+    nil))
 
 ;;; Error / warning reporting:
 (defun smol1-error (message error-context)
