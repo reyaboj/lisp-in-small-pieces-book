@@ -129,7 +129,8 @@ value stored at the location to which the variable is bound."
 	       variable-value)))
 
 (defun smol1-eval/quote (arguments)
-  "Return the single argument in ARGUMENTS without further evaluation."
+  "Return the single argument in the list, ARGUMENTS, without further
+evaluation."
   (if (cdr arguments)
       (smol1-error "QUOTE form with excess arguments"
 		   `( :expected (quote ,(car arguments))
