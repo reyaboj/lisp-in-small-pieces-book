@@ -57,12 +57,7 @@ code 😎"
     (let ((operator-form (car exp))
 	  (operand-forms (cdr exp)))
       (cl-case operator-form
-	((quote)
-	 (if (cdr operand-forms)
-	     (smol1-error "QUOTE form with excess arguments"
-			  `( :expected (quote ,(car operand-forms))
-			     :actual (quote ,@operand-forms) ))
-	   (car operand-forms)))
+	((quote) (smol1-eval/quote operand-forms))
 	((if)
 	 (let* ((test (car operand-forms))
 		(consequent (cadr operand-forms))
@@ -138,6 +133,14 @@ code 😎"
 		 (smol1-error "Unbound variable"
 			      `(:variable ,exp :current-environment ,env))
 	       variable-value)))
+
+(defun smol1-eval/quote (arguments)
+  "Return the single argument in ARGUMENTS without further evaluation."
+  (if (cdr arguments)
+      (smol1-error "QUOTE form with excess arguments"
+		   `( :expected (quote ,(car arguments))
+		      :actual (quote ,@arguments) ))
+    (car arguments)))
 
 ;;; Special values
 (defconst smol1-constant-void (list 'smol1 :void)
