@@ -130,10 +130,11 @@ evaluation."
     (car arguments)))
 
 (defun smol1-eval/if (operands env)
-  "Return the result of a branching computation of form (if TEST THEN ELSE)
-where the result is obtained by evaluating THEN if TEST evaluates to true (not
-false), otherwise the result is simply what ELSE evaluates to, if it is
-present. If the ELSE branch is missing, the result is the special void value."
+  "Return the result of a branching computation of form (TEST THEN ELSE), given
+by OPERANDS, where the result is obtained by evaluating THEN if TEST evaluates
+to true (not false), otherwise the result is simply what ELSE evaluates to, if
+it is present. If the ELSE branch is missing, the result is the special void
+value. All evaluations take place within environment ENV."
   (let* ((test (car operands))
 	 (consequent (cadr operands))
 	 (alternate (caddr operands))
