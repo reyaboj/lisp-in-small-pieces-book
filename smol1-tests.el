@@ -18,6 +18,7 @@
 (add-to-list 'load-path default-directory)
 (require 'ert)
 (require 'smol1)
+(setq smol1-trace-on nil)		; disable tracing
 
 ;;; Evaluator
 
