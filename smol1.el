@@ -58,14 +58,7 @@ code 😎"
 	  (operand-forms (cdr exp)))
       (cl-case operator-form
 	((quote) (smol1-eval/quote operand-forms))
-	((if)
-	 (let* ((test (car operand-forms))
-		(consequent (cadr operand-forms))
-		(alternate (caddr operand-forms))
-		(test-result (smol1-eval test env)))
-	   (if (eq smol1-constant-false test-result)
-	       (if alternate (smol1-eval alternate env) smol1-constant-void)
-	     (smol1-eval consequent env))))
+	((if) (smol1-eval/if operand-forms env))
 	((begin)
 	 (if (null operand-forms)
 	     (smol1-error "Empty BEGIN" '( :expected (begin FORM-1 FORM ...)
@@ -142,6 +135,19 @@ value stored at the location to which the variable is bound."
 		   `( :expected (quote ,(car arguments))
 		      :actual (quote ,@arguments) ))
     (car arguments)))
+
+(defun smol1-eval/if (operands env)
+  "Return the result of a branching computation of form (if TEST THEN ELSE)
+where the result is obtained by evaluating THEN if TEST evaluates to true (not
+false), otherwise the result is simply what ELSE evaluates to, if it is
+present. If the ELSE branch is missing, the result is the special void value."
+  (let* ((test (car operands))
+	 (consequent (cadr operands))
+	 (alternate (caddr operands))
+	 (test-result (smol1-eval test env)))
+    (if (eq smol1-constant-false test-result)
+	(if alternate (smol1-eval alternate env) smol1-constant-void)
+      (smol1-eval consequent env))))
 
 ;;; Special values
 (defconst smol1-constant-void (list 'smol1 :void)
