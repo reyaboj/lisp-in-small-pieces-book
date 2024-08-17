@@ -122,11 +122,17 @@ code 😎"
 				rest-parameter
 				(nthcdr num-required-parameters arguments)))))
 		   (smol1-eval `(begin ,@body) env)))))))
-	(otherwise (funcall (smol1-eval operator-form env)
-			    env
-			    (mapcar #'(lambda (arg-form)
-					(smol1-eval arg-form env))
-				    operand-forms))))))))
+	(otherwise
+	 (run-hook-with-args 'smol1-trace-functions exp)
+	 (let* ((operator (smol1-eval operator-form env))
+		(operands (mapcar #'(lambda (arg-form)
+				      (smol1-eval arg-form env))
+				  operand-forms))
+		(value (funcall operator env operands)))
+	   (run-hook-with-args 'smol1-trace-functions
+			       `(,operator-form ,@operands)
+			       value)
+	   value)))))))
 
 ;;; Special values
 (defconst smol1-constant-void (list 'smol1 :void)
@@ -235,6 +241,21 @@ PARAMETERS and Ai is from ARGUMENTS."
   "Signal an error with the supplied MESSAGE, printing the read representation
 of ERROR-CONTEXT."
   (error "%s\n%S" message error-context))
+
+;;; Tracing hook
+(defvar smol1-trace-functions nil
+  "An abormal hook run with intermediate forms, optionally supplying their
+results, during evaluation. These functions could be used to perform tracing
+evaluation steps or similar operations.")
+
+(defun smol1-stepwise-trace-function (form-now &optional form-value)
+  "Log a message displaying the smol1 form FORM-NOW (and possibly its result
+FORM-VALUE) at this evaluation step."
+  (if form-value
+      (message "smol1> %S => %S" form-now form-value)
+    (message "smol1> %S" form-now)))
+
+(add-hook 'smol1-trace-functions #'smol1-stepwise-trace-function)
 
 (provide 'smol1)
 
