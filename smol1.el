@@ -52,12 +52,7 @@ code 😎"
     (cond ((or (numberp exp) (characterp exp) (stringp exp) (vectorp exp))
 	   exp)
 	  ((smol1-boolean-p exp) (smol1-boolean<-literal exp))
-	  ((symbolp exp)
-	   (let ((variable-value (smol1-env-get env (smol1-key<-symbol exp))))
-	     (if (eq smol1-constant-void variable-value)
-		 (smol1-error "Unbound variable"
-			      `(:variable ,exp :current-environment ,env))
-	       variable-value)))))
+	  ((symbolp exp) (smol1-eval/variable exp env))))
    (:else
     (let ((operator-form (car exp))
 	  (operand-forms (cdr exp)))
@@ -135,6 +130,14 @@ code 😎"
 				    `(,operator-form ,@operands)
 				    value))
 	   value)))))))
+
+(defun smol1-eval/variable (exp env)
+  "Evaluate a variable reference EXP given environment ENV."
+  (let ((variable-value (smol1-env-get env (smol1-key<-symbol exp))))
+	     (if (eq smol1-constant-void variable-value)
+		 (smol1-error "Unbound variable"
+			      `(:variable ,exp :current-environment ,env))
+	       variable-value)))
 
 ;;; Special values
 (defconst smol1-constant-void (list 'smol1 :void)
