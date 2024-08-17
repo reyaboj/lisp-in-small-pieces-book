@@ -61,38 +61,6 @@ code 😎"
 	((if) (smol1-eval/if operand-forms env))
 	((begin) (smol1-eval/begin operand-forms env))
 	((set!) (smol1-eval/set! operand-forms env))
-	((lambda)
-	 (let* ((parameter-spec (car operand-forms))
-		(body (cdr operand-forms))
-		(parameters (smol1-lambda-parameters-parse parameter-spec))
-		(required-parameters
-		 (smol1-lambda-parameters-get parameters :required))
-		(rest-parameter
-		 (smol1-lambda-parameters-get parameters :rest))
-		(num-required-parameters (length required-parameters))
-		(definition-env env))
-	   (if (null body)
-	       (smol1-error
-		"Lambda with empty body"
-		`( :expected (lambda ,parameter-spec BODY-FORM...+)
-		   :actual ,exp )))
-	   (lambda (call-env &optional arguments)
-	     (let ((required-arguments (take num-required-parameters arguments)))
-	       (if (not (= num-required-parameters (length required-arguments)))
-		   (smol1-error "Arity mismatch"
-				`( :parameters ,parameters
-				   :arguments ,arguments ))
-		 (let* ((env (apply #'smol1-env-bind
-				    definition-env
-				    (smol1-interleave-params-and-args
-				     required-parameters
-				     required-arguments)))
-			(env (if (not rest-parameter) env
-			       (smol1-env-bind
-				env
-				rest-parameter
-				(nthcdr num-required-parameters arguments)))))
-		   (smol1-eval `(begin ,@body) env)))))))
 	(otherwise
 	 (and smol1-trace-on
 	      (run-hook-with-args 'smol1-trace-functions exp))
@@ -106,6 +74,7 @@ code 😎"
 				    `(,operator-form ,@operands)
 				    value))
 	   value)))))))
+	((lambda) (smol1-eval/lambda operand-forms env))
 
 (defun smol1-eval/variable (exp env)
   "Evaluate a variable reference EXP given environment ENV by looking up the
@@ -165,6 +134,41 @@ modify it."
 		   `( :variable ,variable
 		      :env ,env )))))
 
+(defun smol1-eval/lambda (operands env)
+  "Return a procedure, closing environment ENV and parsing OPERANDS as
+(PARAMETER-SPECIFICATION BODY ...+). The value can be used in a later
+application / function call."
+  (let* ((parameter-spec (car operands))
+	 (body (cdr operands))
+	 (parameters (smol1-lambda-parameters-parse parameter-spec))
+	 (required-parameters
+	  (smol1-lambda-parameters-get parameters :required))
+	 (rest-parameter
+	  (smol1-lambda-parameters-get parameters :rest))
+	 (num-required-parameters (length required-parameters))
+	 (definition-env env))
+    (if (null body)
+	(smol1-error
+	 "Lambda with empty body"
+	 `( :expected (lambda ,parameter-spec BODY-FORM...+)
+	    :actual ,exp )))
+    (lambda (call-env &optional arguments)
+      (let ((required-arguments (take num-required-parameters arguments)))
+	(if (not (= num-required-parameters (length required-arguments)))
+	    (smol1-error "Arity mismatch"
+			 `( :parameters ,parameters
+			    :arguments ,arguments ))
+	  (let* ((env (apply #'smol1-env-bind
+			     definition-env
+			     (smol1-interleave-params-and-args
+			      required-parameters
+			      required-arguments)))
+		 (env (if (not rest-parameter) env
+			(smol1-env-bind
+			 env
+			 rest-parameter
+			 (nthcdr num-required-parameters arguments)))))
+	    (smol1-eval/begin body env)))))))
 ;;; Special values
 (defconst smol1-constant-void (list 'smol1 :void)
   "A special value indicating the absence of any appropriate value.")
