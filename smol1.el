@@ -273,6 +273,24 @@ considered invalid and an error is thrown from the bound primitive."
 				  `( :primitive ,primitive-name
 				     :arguments ,args
 				     :host-error ,host-error-data )))))))
+
+;;; Initial environment
+(defconst smol1-initial-environment (smol1-env-create)
+  "The initial, empty environment.")
+
+;;; Global environment
+(defvar smol1-global-environment smol1-initial-environment
+  "The global environment, which is the initial environment extended with useful
+functions.")
+
+(let ((e smol1-initial-environment))
+  (setq e (smol1-env-defprimitive
+	   e 'eq? #'eq
+	   #'(lambda (o1 o2) t)
+	   #'(lambda (x) (if x smol1-constant-true
+			   smol1-constant-false))))
+  (setq smol1-global-environment e))
+
 ;;; Error / warning reporting:
 (defun smol1-error (message error-context)
   "Signal an error with the supplied MESSAGE, printing the read representation
