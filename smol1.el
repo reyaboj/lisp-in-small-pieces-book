@@ -61,20 +61,8 @@ code 😎"
 	((if) (smol1-eval/if operand-forms env))
 	((begin) (smol1-eval/begin operand-forms env))
 	((set!) (smol1-eval/set! operand-forms env))
-	(otherwise
-	 (and smol1-trace-on
-	      (run-hook-with-args 'smol1-trace-functions exp))
-	 (let* ((operator (smol1-eval operator-form env))
-		(operands (mapcar #'(lambda (arg-form)
-				      (smol1-eval arg-form env))
-				  operand-forms))
-		(value (funcall operator env operands)))
-	   (and smol1-trace-on
-		(run-hook-with-args 'smol1-trace-functions
-				    `(,operator-form ,@operands)
-				    value))
-	   value)))))))
 	((lambda) (smol1-eval/lambda operand-forms env))
+	(otherwise (smol1-eval/apply exp operator-form operand-forms env)))))))
 
 (defun smol1-eval/variable (exp env)
   "Evaluate a variable reference EXP given environment ENV by looking up the
@@ -169,6 +157,25 @@ application / function call."
 			 rest-parameter
 			 (nthcdr num-required-parameters arguments)))))
 	    (smol1-eval/begin body env)))))))
+
+(defun smol1-eval/apply (form operator-form operand-forms env)
+  "Evaluate application form FORM of shape (OP ARGS ...) by resolving
+OPERATOR-FORM to a function OP, evaluating OPERAND-FORMS to a list of arguments
+(ARGS ...), and calling OP with this argument list to obtain a result."
+  ;; trace pre-call
+  (and smol1-trace-on
+       (run-hook-with-args 'smol1-trace-functions form))
+  (let* ((operator (smol1-eval operator-form env))
+	 (operands (mapcar #'(lambda (arg-form)
+			       (smol1-eval arg-form env))
+			   operand-forms))
+	 (value (funcall operator env operands)))
+    (and smol1-trace-on
+	 (run-hook-with-args 'smol1-trace-functions
+			     `(,operator-form ,@operands)
+			     value))
+    value))
+
 ;;; Special values
 (defconst smol1-constant-void (list 'smol1 :void)
   "A special value indicating the absence of any appropriate value.")
