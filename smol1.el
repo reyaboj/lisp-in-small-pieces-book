@@ -59,15 +59,7 @@ code 😎"
       (cl-case operator-form
 	((quote) (smol1-eval/quote operand-forms))
 	((if) (smol1-eval/if operand-forms env))
-	((begin)
-	 (if (null operand-forms)
-	     (smol1-error "Empty BEGIN" '( :expected (begin FORM-1 FORM ...)
-					   :actual (begin) ))
-	   (named-let eval-begin ((body operand-forms))
-	     (if (null (cdr body))
-		 (smol1-eval (car body) env)
-	       (smol1-eval (car body) env)
-	       (eval-begin (cdr body))))))
+	((begin) (smol1-eval/begin operand-forms env))
 	((set!)
 	 (let* ((variable (car operand-forms))
 		(value-form (cadr operand-forms))
@@ -149,6 +141,18 @@ present. If the ELSE branch is missing, the result is the special void value."
     (if (eq smol1-constant-false test-result)
 	(if alternate (smol1-eval alternate env) smol1-constant-void)
       (smol1-eval consequent env))))
+
+(defun smol1-eval/begin (operands env)
+  "Return the result of evaluating the last form in a non-empty list of
+forms given by OPERANDS, with environment ENV as the current active bindings."
+  (if (null operands)
+      (smol1-error "Empty BEGIN" '( :expected (begin FORM-1 FORM ...)
+				    :actual (begin) ))
+    (named-let eval-begin ((body operands))
+      (if (null (cdr body))
+	  (smol1-eval (car body) env)
+	(smol1-eval (car body) env)
+	(eval-begin (cdr body))))))
 
 ;;; Special values
 (defconst smol1-constant-void (list 'smol1 :void)
