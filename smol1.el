@@ -27,12 +27,25 @@
   "Evaluate EXP as a smol1 program, using ENV as the environment of bindings for
 free variables. The smol1 dialect is a subset of scheme.
 
-The following forms F are recognized:
-  a symbol S (variable)
-  an atom that is not a symbol (e.g., 1, \"foo\", [a b 1 2], $t, $f)
-  a special form (quote, if, begin, set!)
-  an applicative form where the CAR designates a function and the CDR designates
-    the argument list for the call"
+The following forms F are evaluated:
+
+  a symbol S is evaluated as a variable reference;
+    when S is `$t' or `'$f', S evaluates to the true / false booleans
+
+  numbers, characters, strings, and vectors evaluate to themselves
+    vector elements are not evaluated (i.e., they are implicitly quoted)
+
+  a list of the form (OPERATOR OPERAND ...) is evaluated as follows
+    if OPERATOR is not special:
+      F <- evaluate OPERATOR
+      X <- list of (evaluate OPERAND ...)
+      evaluate the body of F with its formal parameters bound to corresponding
+      values (matched positionally) in X, binding a rest parameter (if present)
+
+    if OPERATOR is special, yield the usual meaning of that operator in scheme
+
+These are the broad strokes of the evaluator. For details, refer to the source
+code 😎"
   (setq env (or env (smol1-env-create)))
   (cond
    ((atom exp)
