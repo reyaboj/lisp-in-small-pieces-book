@@ -123,15 +123,17 @@ code 😎"
 				(nthcdr num-required-parameters arguments)))))
 		   (smol1-eval `(begin ,@body) env)))))))
 	(otherwise
-	 (run-hook-with-args 'smol1-trace-functions exp)
+	 (and smol1-trace-on
+	      (run-hook-with-args 'smol1-trace-functions exp))
 	 (let* ((operator (smol1-eval operator-form env))
 		(operands (mapcar #'(lambda (arg-form)
 				      (smol1-eval arg-form env))
 				  operand-forms))
 		(value (funcall operator env operands)))
-	   (run-hook-with-args 'smol1-trace-functions
-			       `(,operator-form ,@operands)
-			       value)
+	   (and smol1-trace-on
+		(run-hook-with-args 'smol1-trace-functions
+				    `(,operator-form ,@operands)
+				    value))
 	   value)))))))
 
 ;;; Special values
@@ -298,6 +300,9 @@ of ERROR-CONTEXT."
   (error "%s\n%S" message error-context))
 
 ;;; Tracing hook
+(defvar smol1-trace-on nil
+  "Controls whether function tracing is performed by `smol1-eval'")
+
 (defvar smol1-trace-functions nil
   "An abormal hook run with intermediate forms, optionally supplying their
 results, during evaluation. These functions could be used to perform tracing
