@@ -53,16 +53,16 @@ code 😎"
 	   exp)
 	  ((smol1-boolean-p exp) (smol1-boolean<-literal exp))
 	  ((symbolp exp) (smol1-eval/variable exp env))))
-   (:else
-    (let ((operator-form (car exp))
-	  (operand-forms (cdr exp)))
-      (cl-case operator-form
-	((quote) (smol1-eval/quote operand-forms))
-	((if) (smol1-eval/if operand-forms env))
-	((begin) (smol1-eval/begin operand-forms env))
-	((set!) (smol1-eval/set! operand-forms env))
-	((lambda) (smol1-eval/lambda operand-forms env))
-	(otherwise (smol1-eval/apply exp operator-form operand-forms env)))))))
+   (:else (funcall (smol1-eval/syntax-of-form exp) exp env))))
+
+(defun smol1-eval/syntax-of-form (form)
+  (cl-case (car form)
+    (quote #'smol1-eval/quote)
+    (if #'smol1-eval/if)
+    (begin #'smol1-eval/begin)
+    (set! #'smol1-eval/set!)
+    (lambda #'smol1-eval/lambda)
+    (otherwise #'smol1-eval/apply)))
 
 (defun smol1-eval/variable (exp env)
   "Evaluate a variable reference EXP given environment ENV by looking up the
@@ -73,48 +73,46 @@ value stored at the location to which the variable is bound."
 			      `(:variable ,exp :current-environment ,env))
 	       variable-value)))
 
-(defun smol1-eval/quote (arguments)
-  "Return the single argument in the list, ARGUMENTS, without further
-evaluation."
-  (if (cdr arguments)
+(defun smol1-eval/quote (exp _)
+  "Return the unevaluated VAL in EXP where EXP is a (quote VAL) form."
+  (if (cddr exp)
       (smol1-error "QUOTE form with excess arguments"
-		   `( :expected (quote ,(car arguments))
-		      :actual (quote ,@arguments) ))
-    (car arguments)))
+		   `( :expected (quote ,(cadr exp))
+		      :actual ,exp ))
+    (cadr exp)))
 
-(defun smol1-eval/if (operands env)
-  "Return the result of a branching computation of form (TEST THEN ELSE), given
-by OPERANDS, where the result is obtained by evaluating THEN if TEST evaluates
-to true (not false), otherwise the result is simply what ELSE evaluates to, if
-it is present. If the ELSE branch is missing, the result is the special void
-value. All evaluations take place within environment ENV."
-  (let* ((test (car operands))
-	 (consequent (cadr operands))
-	 (alternate (caddr operands))
+(defun smol1-eval/if (exp env)
+  "Return the result of EXP of form (if TEST THEN ELSE) such that the result is
+either obtained by evaluating THEN (if TEST evaluates to true) or ELSE, if TEST
+is not true and ELSE is present. If ELSE is absent and TEST yields false, the
+void value results."
+  (let* ((test (cadr exp))
+	 (consequent (caddr exp))
+	 (alternate (cadddr exp))
 	 (test-result (smol1-eval test env)))
     (if (eq smol1-constant-false test-result)
 	(if alternate (smol1-eval alternate env) smol1-constant-void)
       (smol1-eval consequent env))))
 
-(defun smol1-eval/begin (operands env)
-  "Return the result of evaluating the last form in a non-empty list of
-forms given by OPERANDS, with environment ENV as the current active bindings."
-  (if (null operands)
-      (smol1-error "Empty BEGIN" '( :expected (begin FORM-1 FORM ...)
-				    :actual (begin) ))
-    (named-let eval-begin ((body operands))
+(defun smol1-eval/begin (exp env)
+  "Return the result of evaluating EXP of form (begin BODY ...+) where BODY is a
+non-empty list of forms."
+  (if (null (cdr exp))
+      (smol1-error "Empty BEGIN" `( :expected (begin FORM-1 FORM ...)
+				    :actual ,exp  ))
+    (named-let eval-begin ((body (cdr exp)))
       (if (null (cdr body))
 	  (smol1-eval (car body) env)
 	(smol1-eval (car body) env)
 	(eval-begin (cdr body))))))
 
-(defun smol1-eval/set! (operands env)
-  "Modify environment ENV based on (VAR VALUE-FORM) supplied by OPERANDS. The
-return value is unspecified and should be discarded. It is an error if the
-variable VAR does not have an existing binding at the point of attempting to
-modify it."
-  (let* ((variable (car operands))
-	 (value-form (cadr operands))
+(defun smol1-eval/set! (exp env)
+  "Modify environment ENV according to EXP of form (set! VARIABLE VALUE-FORM) by
+changing an existing binding for VARIABLE in ENV to the result of evaluating
+VALUE-FORM. The return value is unspecified (but void is returned); it is an
+error to attempt to set! a variable that has no binding."
+  (let* ((variable (cadr exp))
+	 (value-form (caddr exp))
 	 (value (smol1-eval value-form env)))
     (if (smol1-env-rebind env (smol1-key<-symbol variable) value)
 	smol1-constant-void
@@ -122,12 +120,12 @@ modify it."
 		   `( :variable ,variable
 		      :env ,env )))))
 
-(defun smol1-eval/lambda (operands env)
-  "Return a procedure, closing environment ENV and parsing OPERANDS as
-(PARAMETER-SPECIFICATION BODY ...+). The value can be used in a later
-application / function call."
-  (let* ((parameter-spec (car operands))
-	 (body (cdr operands))
+(defun smol1-eval/lambda (exp env)
+  "Return a procedure, closing environment ENV and parsing EXP as (lambda
+PARAMETER-SPECIFICATION BODY ...+). The value can be used in a later function
+call."
+  (let* ((parameter-spec (cadr exp))
+	 (body (cddr exp))
 	 (parameters (smol1-lambda-parameters-parse parameter-spec))
 	 (required-parameters
 	  (smol1-lambda-parameters-get parameters :required))
@@ -156,23 +154,23 @@ application / function call."
 			 env
 			 rest-parameter
 			 (nthcdr num-required-parameters arguments)))))
-	    (smol1-eval/begin body env)))))))
+	    (smol1-eval/begin `(begin ,@body) env)))))))
 
-(defun smol1-eval/apply (form operator-form operand-forms env)
+(defun smol1-eval/apply (exp env)
   "Evaluate application form FORM of shape (OP ARGS ...) by resolving
 OPERATOR-FORM to a function OP, evaluating OPERAND-FORMS to a list of arguments
 (ARGS ...), and calling OP with this argument list to obtain a result."
   ;; trace pre-call
   (and smol1-trace-on
-       (run-hook-with-args 'smol1-trace-functions form))
-  (let* ((operator (smol1-eval operator-form env))
+       (run-hook-with-args 'smol1-trace-functions exp))
+  (let* ((operator (smol1-eval (car exp) env))
 	 (operands (mapcar #'(lambda (arg-form)
 			       (smol1-eval arg-form env))
-			   operand-forms))
+			   (cdr exp)))
 	 (value (funcall operator env operands)))
     (and smol1-trace-on
 	 (run-hook-with-args 'smol1-trace-functions
-			     `(,operator-form ,@operands)
+			     `(,(car exp) ,@operands)
 			     value))
     value))
 
